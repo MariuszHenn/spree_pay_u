@@ -52,3 +52,4 @@ pl:
   error507: błąd podczas zwrotu środków do klienta
   error599: błędny stan transakcji, np. nie można uznać transakcji kilka razy lub inny, prosimy o kontakt
   error999: inny błąd krytyczny - prosimy o kontakt
+
