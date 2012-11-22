@@ -1,24 +1,32 @@
 module Spree
   class PaymentMethod::PayU < PaymentMethod
     
-    attr_accessible :preferred_pos_id, :preferred_pos_auth_key, :preferred_test_mode, :preferred_url, :preferred_test_url
+    attr_accessible :preferred_pos_id, :preferred_pos_auth_key, :preferred_test_mode, :preferred_key1, :preferred_key2
 
     preference :test_mode, :boolean, :default => false
     preference :pos_id, :string
     preference :pos_auth_key, :string
-    preference :url, :string, :default => "https://www.platnosci.pl/paygw/UTF/NewPayment"
-    preference :test_url, :string, :default => "https://sandbox.platnosci.pl/paygw/UTF/NewPayment"
+    preference :key1, :string
+    preference :key2, :string
 
     def payment_profiles_supported?
       false
     end
     
-    def post_url
+    def url
       if preferred_test_mode
-        preferred_test_url
+        s = "sandbox."
       else
-        preferred_url
+        s=""
       end
+      "https://"+s+"payu.pl/paygw/UTF/"
+    end
+    
+    def get_url
+      url+"Payment/get"
+    end  
+    def post_url
+      url+"NewPayment"
     end
 
     def pay_type

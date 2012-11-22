@@ -20,7 +20,7 @@ module Spree
       end
     end
     def error
-      @order = Order.find_by_number(params[:order_id])
+      @errormsg = I18n.t("error"+params[:error])
     end
     
     # redirecting from dotpay.pl
