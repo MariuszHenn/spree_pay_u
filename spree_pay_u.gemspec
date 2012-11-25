@@ -3,7 +3,7 @@
 Gem::Specification.new do |s|
   s.platform              = Gem::Platform::RUBY
   s.name                  = 'spree_pay_u'
-  s.version               = '0.1.2'
+  s.version               = '0.1.3'
   s.summary               = 'PayU.pl payment system for Spree'
   s.required_ruby_version = '>= 1.8.7'
   s.author                = 'Mariusz Henn'

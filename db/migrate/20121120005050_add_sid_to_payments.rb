@@ -1,5 +1,5 @@
 class AddSidToPayments < ActiveRecord::Migration
-  def change
+  def self.up
   add_column :spree_payments, :sid, :string
   end
 end
