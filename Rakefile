@@ -5,8 +5,9 @@ require 'rake'
 require 'rake/testtask'
 require 'rake/packagetask'
 require 'rake/gempackagetask'
+require 'bundler/setup'
 
-spec = eval(File.read('pay_u.gemspec'))
+spec = eval(File.read('spree_pay_u.gemspec'))
 
 Rake::GemPackageTask.new(spec) do |p|
   p.gem_spec = spec

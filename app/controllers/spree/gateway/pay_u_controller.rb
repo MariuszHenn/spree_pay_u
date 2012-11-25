@@ -5,8 +5,8 @@ module Spree
   
     # Show form Dotpay for pay
     def show
-      #@payu_session_id = request.session_options[:id]
-      @payu_session_id = Time.now.to_i.to_s
+      @payu_session_id = request.session_options[:id]
+      #@payu_session_id = Time.now.to_i.to_s
       @order = Order.find(params[:order_id])
       @client_ip = @order.ip_address
       @gateway = @order.available_payment_methods.find{|x| x.id == params[:gateway_id].to_i }
