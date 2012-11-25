@@ -23,7 +23,7 @@ module Spree
     end
     
     def get_url
-      url+"Payment/get"
+      url+"Payment/get/txt"
     end  
     def post_url
       url+"NewPayment"

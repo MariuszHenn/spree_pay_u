@@ -24,11 +24,10 @@
     <%= hidden_field_tag 'pos_auth_key', @gateway.preferred_pos_auth_key %>
     <%= hidden_field_tag 'session_id', @payu_session_id %>
     <%= hidden_field_tag 'client_ip', @client_ip %>
-    <%= hidden_field_tag 'desc', "#{Spree::Config[:site_name]} zamowienie: #{@order.number}" %>
-    <%= hidden_field_tag 'order_id', @order.number %>
-    <%= hidden_field_tag 'amount', @order.total.to_s %>
+    <%= hidden_field_tag 'desc', "#{Spree::Config[:site_name]} zamowienie nr #{@order.number}" %>
+    <%= hidden_field_tag 'order_id', @order.id %>
+    <%= hidden_field_tag 'amount', @total %>
     <%= hidden_field_tag 'pay_type', @gateway.pay_type %>
-    <%= hidden_field_tag 'URL', gateway_pay_u_complete_url(@order.number) %>
     <%= hidden_field_tag 'first_name', @bill_address.firstname %>
     <%= hidden_field_tag 'last_name', @bill_address.lastname %>
     <%= hidden_field_tag 'street', @bill_address.address1 %>

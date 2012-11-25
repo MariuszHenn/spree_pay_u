@@ -5,13 +5,14 @@ module Spree
   
     # Show form Dotpay for pay
     def show
-      @payu_session_id = Time.now.to_f.to_s
+      #@payu_session_id = request.session_options[:id]
+      @payu_session_id = Time.now.to_i.to_s
       @order = Order.find(params[:order_id])
       @client_ip = @order.ip_address
       @gateway = @order.available_payment_methods.find{|x| x.id == params[:gateway_id].to_i }
       @order.payments.destroy_all
-      payment = @order.payments.create!(:amount => 0, :payment_method_id => @gateway.id)
-
+      payment = @order.payments.create!(:amount => 0, :payment_method_id => @gateway.id, :sid => @payu_session_id)
+      @total = (@order.total*100).to_i.to_s
       if @order.blank? || @gateway.blank?
         flash[:error] = I18n.t("invalid_arguments")
         redirect_to :back
@@ -19,65 +20,91 @@ module Spree
         @bill_address, @ship_address = @order.bill_address, (@order.ship_address || @order.bill_address)
       end
     end
+    
     def error
       @errormsg = I18n.t("error"+params[:error])
     end
     
-    # redirecting from dotpay.pl
+    # redirecting from PayU
     def complete
-      @order = Order.find_by_number(params[:format])
+      @order = Order.find(params[:order_id])
       session[:order_id]=nil
-      if @order.state=="complete"
-        flash[:payment_success] = I18n.t("payment_success")
+      if @order.state=="complete" 
+        redirect_to order_url(@order,{:checkout_complete => true, :order_token =>@order.token}), :notice => I18n.t("payment_success")
       else
-        flash[:payment_failure] = I18n.t("payment_error")
+        redirect_to order_url(@order)
       end
-      redirect_to products_url
     end
-  
+
     # Result from Dotpay
     def comeback
-      @order = Order.find_by_number(params[:control])
+      @order = Order.find(params[:order_id])
       @gateway = @order && @order.payments.first.payment_method
-  
-      if dotpay_pl_validate(@gateway, params, request.remote_ip)
-        if params[:t_status]=="2" # dotpay state for payment confirmed
-          dotpay_pl_payment_success(params)
-        elsif params[:t_status] == "4" or params[:t_status] == "5" #dotpay states for cancellation and so on
-          dotpay_pl_payment_cancel(params)
-        elsif params[:t_status] == "1"  #dotpay state for starting payment processing (1)
-          dotpay_pl_payment_new(params) 
+      body = get_data(@gateway, @order)
+      if validate_response(body,@gateway)
+        t_status = get_value(body, "trans_status")
+        if t_status.to_i == 99
+          @order.payment.started_processing
+	  if @order.total.to_f == get_value(body,"trans_amount").to_f/100
+            @order.payment.complete
+	  end
+          @order.finalize!
+	  @order.next
+	  @order.next
+	  @order.save    
+	  redirect_to gateway_pay_u_complete_path(:order_id => @order.id, :gateway_id => @gateway.id)
+          success = true #payment complete  
+        else 
+          success = false # 
+          redirect_to gateway_pay_u_error_path(:error =>"status"+t_status, :pid => "0") and return 
         end
-        render :text => "OK"
       else
-        render :text => "Not valid"
-      end    
-    end
+        redirect_to gateway_pay_u_error_path(:error =>"_response_missmatch", :pid => "0") and return 
+      end
+   
+      @body = validate_response(body,@gateway)
+    end    
 
 
     private
+    def get_value(body, string)
+     return body.split(string)[1].split("\r\n")[0].split(": ")[1].to_s
+    end
 
     # validating dotpay message
-    def dotpay_pl_validate(gateway, params, remote_ip)    
-      calc_md5 = Digest::MD5.hexdigest(@gateway.preferred_pin + ":" +
-        (params[:id].nil? ? "" : params[:id]) + ":" +
-        (params[:control].nil? ? "" : params[:control]) + ":" +
-        (params[:t_id].nil? ? "" : params[:t_id]) + ":" + 
-        (params[:amount].nil? ? "" : params[:amount]) + ":" + 
-        (params[:email].nil? ? "" : params[:email]) + ":" +
-        (params[:service].nil? ? "" : params[:service]) + ":" +
-        (params[:code].nil? ? "" : params[:code]) + ":" +
-        ":" +
-        ":" +
-        (params[:t_status].nil? ? "" : params[:t_status]))
-        md5_valid = (calc_md5 == params[:md5])
-
-        if (remote_ip == @gateway.preferred_dotpay_server_1 || remote_ip == @gateway.preferred_dotpay_server_2) && md5_valid
-          valid = true #yes, it is
-        else
-         valid = false #no, it isn't
-        end 
-        valid
+    def get_data(gateway, order)
+      require 'net/https'
+      require 'net/http'
+      require 'open-uri'
+      require 'openssl'
+      sid = order.payments.first.sid
+      ts = Time.now.to_f.to_s
+      sig = Digest::MD5.hexdigest(gateway.preferred_pos_id+""+sid+""+ts+""+gateway.preferred_key1)
+      params_new = {:pos_id => gateway.preferred_pos_id, :session_id => sid, :ts => ts, :sig => sig}
+      url = URI.parse(gateway.get_url)
+      req = Net::HTTP::Post.new(url.path,{"User-Agent" => "Mozilla/5.0 (X11; U; Linux x86_64; en-US; rv:1.9.2.10) Gecko/20100915 Ubuntu/10.04 (lucid) Firefox/3.6.10"})
+      req.form_data = params_new
+      #req.basic_auth url.user, url.password if url.user
+      con = Net::HTTP.new(url.host, 443)
+      con.use_ssl = true
+      con.verify_mode = OpenSSL::SSL::VERIFY_NONE
+      response = con.start {|http| http.request(req)}
+      return response.body
+    end
+    
+    def validate_response(body, gateway)
+      ##pos_id + sessiion_id + order_id + status + amount + desc + ts + key2
+      pid = get_value(body, "trans_pos_id")
+      sid = get_value(body, "trans_session_id")
+      oid = get_value(body, "trans_order_id")
+      sta = get_value(body, "trans_status")
+      amo = get_value(body, "trans_amount")
+      des = get_value(body, "trans_desc")
+      ts = get_value(body, "trans_ts")
+      sig = get_value(body, "trans_sig")
+      key2 = gateway.preferred_key2
+      mysig = Digest::MD5.hexdigest(pid+""+sid+""+oid+""+sta+""+amo+""+des+""+ts+""+key2)
+      return mysig == sig
     end
 
     # Completed payment process
