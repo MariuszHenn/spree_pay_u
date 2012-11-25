@@ -14,7 +14,7 @@ module SpreePayU
     end
     config.to_prepare do
       Dir.glob(File.join(File.dirname(__FILE__), "../../app/**/*_decorator*.rb")) do |c|
-        Rails.application.config.cache_classes ? reqire(c) : load(c)
+        Rails.application.config.cache_classes ? require(c) : load(c)
       end
     end
   end
